@@ -5,6 +5,7 @@ import { Phone } from "@/lib/types";
 import { formatINR } from "@/lib/format";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/lib/toast-context";
+import CompareButton from "@/components/CompareButton";
 
 export default function PhoneCard({ phone }: { phone: Phone }) {
   const { addItem } = useCart();
@@ -86,6 +87,9 @@ export default function PhoneCard({ phone }: { phone: Phone }) {
         {phone.stock <= 8 && (
           <p className="mt-1 text-xs font-semibold text-red-600">Only {phone.stock} left!</p>
         )}
+        <div className="mt-2" onClick={(e) => e.preventDefault()}>
+          <CompareButton phoneId={phone.id} phoneName={phone.model} size="sm" />
+        </div>
       </div>
     </Link>
   );

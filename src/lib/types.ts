@@ -39,8 +39,11 @@ export type Order = {
   pincode: string;
   status: OrderStatus;
   payment_status: "PAID";
+  payment_method?: string;
   total: number;
   created_at: string;
+  assigned_staff_id?: number | null;
+  staff_name?: string | null;
 };
 
 export type OrderItem = {
@@ -51,6 +54,15 @@ export type OrderItem = {
   image: string;
   price: number;
   qty: number;
+};
+
+export type StaffMember = {
+  id: number;
+  name: string;
+  phone: string;
+  area: string;
+  active: number;
+  created_at: string;
 };
 
 export const STATUS_LABELS: Record<string, string> = {

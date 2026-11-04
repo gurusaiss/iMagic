@@ -5,10 +5,7 @@ import bcrypt from "bcryptjs";
 import { phonePlaceholder } from "./placeholder";
 import { ADMIN_EMAILS } from "./auth-constants";
 
-// On Vercel the project directory is read-only; only /tmp is writable, and it
-// does not persist across cold starts or deployments. This keeps the demo
-// functional there, but data (orders, phone edits) can reset unexpectedly.
-// Fine for a click-through demo; swap for a hosted DB before real production use.
+// On Vercel the project directory is read-only; only /tmp is writable.
 const dataDir = process.env.VERCEL
   ? path.join("/tmp", "imagic-data")
   : path.join(process.cwd(), "data");
@@ -17,7 +14,6 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const dbPath = path.join(dataDir, "app.db");
 
 declare global {
-  // eslint-disable-next-line no-var
   var __imagicDb: Database.Database | undefined;
 }
 
@@ -25,6 +21,7 @@ const db = global.__imagicDb ?? new Database(dbPath);
 if (process.env.NODE_ENV !== "production") global.__imagicDb = db;
 
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS phones (
@@ -58,7 +55,16 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id),
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS staff_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  area TEXT NOT NULL DEFAULT '',
+  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -72,27 +78,43 @@ CREATE TABLE IF NOT EXISTS orders (
   pincode TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'CONFIRMED',
   payment_status TEXT NOT NULL DEFAULT 'PAID',
+  payment_method TEXT NOT NULL DEFAULT 'upi',
   total INTEGER NOT NULL,
+  assigned_staff_id INTEGER REFERENCES staff_members(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id INTEGER NOT NULL REFERENCES orders(id),
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   phone_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   image TEXT NOT NULL,
   price INTEGER NOT NULL,
   qty INTEGER NOT NULL
 );
+
+-- Indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_phones_brand ON phones(brand);
 `);
+
+// Add payment_method column to existing DBs that predate this migration
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'upi'");
+} catch { /* column already exists */ }
+
+// Add assigned_staff_id column to existing DBs
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN assigned_staff_id INTEGER REFERENCES staff_members(id)");
+} catch { /* column already exists */ }
 
 const count = (db.prepare("SELECT COUNT(*) as c FROM phones").get() as { c: number }).c;
 
 if (count === 0) {
-  // INSERT OR IGNORE (keyed on the UNIQUE(brand, model) constraint) because
-  // Next.js's build-time page-data collection runs several worker processes
-  // that each import this module and could otherwise race to double-seed.
   const insert = db.prepare(`
     INSERT OR IGNORE INTO phones (brand, model, price, mrp, ram_gb, storage_gb, display, battery_mah, camera, processor, color, description, image, rating, stock)
     VALUES (@brand, @model, @price, @mrp, @ram_gb, @storage_gb, @display, @battery_mah, @camera, @processor, @color, @description, @image, @rating, @stock)
@@ -177,9 +199,7 @@ if (count === 0) {
   insertMany(seedPhones);
 }
 
-// Next.js collects page data across several worker processes during build,
-// each importing this module and racing to seed the same SQLite file.
-// INSERT OR IGNORE (keyed on the unique email) makes that race harmless.
+// Seed admin and demo customer
 const insertUser = db.prepare(`
   INSERT OR IGNORE INTO users (name, email, password_hash, role) VALUES (@name, @email, @password_hash, @role)
 `);
@@ -195,5 +215,18 @@ insertUser.run({
   password_hash: bcrypt.hashSync("customer123", 10),
   role: "customer",
 });
+
+// Seed demo delivery staff
+const staffCount = (db.prepare("SELECT COUNT(*) as c FROM staff_members").get() as { c: number }).c;
+if (staffCount === 0) {
+  const insertStaff = db.prepare(
+    "INSERT OR IGNORE INTO staff_members (name, phone, area) VALUES (@name, @phone, @area)"
+  );
+  [
+    { name: "Ravi Kumar", phone: "9876543210", area: "North Zone" },
+    { name: "Priya Sharma", phone: "9876543211", area: "South Zone" },
+    { name: "Arjun Singh", phone: "9876543212", area: "East Zone" },
+  ].forEach((s) => insertStaff.run(s));
+}
 
 export default db;
