@@ -4,79 +4,118 @@ import Link from "next/link";
 
 const COLUMNS = [
   {
-    title: "Shop",
+    title: "Shop Flagships",
     links: [
-      { href: "/phones", label: "All Phones" },
-      { href: "/phones?brand=Nexora", label: "Nexora" },
-      { href: "/phones?brand=Veltrix", label: "Veltrix" },
-      { href: "/phones?brand=Orova", label: "Orova" },
-      { href: "/compare", label: "Compare" },
+      { href: "/phones", label: "All Smartphones" },
+      { href: "/phones?brand=Nexora", label: "Nexora Pro & Fold" },
+      { href: "/phones?brand=Veltrix", label: "Veltrix 108MP Series" },
+      { href: "/phones?brand=Orova", label: "Orova 5G Curved" },
+      { href: "/compare", label: "Compare Models" },
+      { href: "/trade-in", label: "Trade-In & Exchange" },
     ],
   },
   {
-    title: "Support",
+    title: "Customer Support",
     links: [
-      { href: "/faq", label: "FAQs" },
-      { href: "/contact", label: "Contact Us" },
-      { href: "/orders", label: "Track Order" },
-      { href: "/trade-in", label: "Trade-In" },
-      { href: "/stores", label: "Find a Store" },
+      { href: "/orders", label: "Track Your Order" },
+      { href: "/stores", label: "Find 50+ Stores" },
+      { href: "/faq", label: "Warranty & Repairs" },
+      { href: "/contact", label: "Contact Helpline" },
+      { href: "/faq", label: "Return & Refund Policy" },
+      { href: "/faq", label: "No-Cost EMI Plans" },
     ],
   },
   {
-    title: "Company",
+    title: "About iMagic",
     links: [
-      { href: "/about", label: "About iMagic" },
-      { href: "/stores", label: "Store Locator" },
-      { href: "/faq", label: "Warranty" },
-      { href: "/contact", label: "Careers" },
+      { href: "/about", label: "Company Overview" },
+      { href: "/stores", label: "Experience Centers" },
+      { href: "/about", label: "Corporate Sales" },
+      { href: "/contact", label: "Careers at iMagic" },
+      { href: "/about", label: "Reseller Credentials" },
     ],
   },
 ];
 
+const PAYMENT_METHODS = ["UPI / QR", "RuPay", "Visa", "Mastercard", "Net Banking", "No-Cost EMI"];
+
 export default function Footer() {
   return (
-    <footer className="border-t border-[var(--border)] bg-[#f5f5f7]">
-      <div className="container-narrow grid grid-cols-2 gap-10 py-14 md:grid-cols-5">
-        <div className="col-span-2 flex flex-col gap-3">
-          <span className="text-lg font-semibold tracking-tight">iMagic</span>
-          <p className="max-w-xs text-sm text-muted">
-            Your authorised destination for Nexora, Veltrix and Orova phones — genuine products,
-            fast delivery and easy returns.
+    <footer className="border-t border-gray-200 bg-[#f5f5f7] text-gray-700">
+      {/* 1. Value Proposition Banner */}
+      <div className="border-b border-gray-200 bg-white py-8">
+        <div className="container-narrow flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-2xl font-bold text-[#0071e3] border border-blue-100">
+              
+            </span>
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Apple &amp; Flagship Premium Reseller</p>
+              <p className="text-xs text-gray-500">Authorized by official Indian brand distributors</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {PAYMENT_METHODS.map((pm) => (
+              <span
+                key={pm}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-700 shadow-2xs"
+              >
+                💳 {pm}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Main Directory Columns */}
+      <div className="container-narrow grid grid-cols-2 gap-8 py-12 md:grid-cols-5">
+        <div className="col-span-2 flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold tracking-tight text-gray-900">iMagic</span>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0071e3] border border-blue-200">
+              Authorised Reseller
+            </span>
+          </div>
+          <p className="max-w-sm text-xs text-gray-500 leading-relaxed">
+            iMagic is India&apos;s premier destination for genuine flagship smartphones. Every device comes with an official brand warranty, GST invoice, and express 24h insured delivery.
           </p>
-          <form
-            action="/api/newsletter"
-            className="mt-2 flex max-w-xs items-center gap-2"
-            onSubmit={(e) => e.preventDefault()}
-          >
-            <input
-              type="email"
-              placeholder="Your email"
-              className="w-full rounded-full border border-[var(--border)] bg-white px-4 py-2 text-sm"
-            />
-            <button type="submit" className="btn-primary px-4 py-2 text-xs">
-              Join
-            </button>
-          </form>
+          <div className="mt-1 space-y-1 text-xs text-gray-600">
+            <p>📞 <strong>Toll-Free Helpline:</strong> 1800-IMAGIC (9 AM – 9 PM)</p>
+            <p>✉️ <strong>Customer Care:</strong> support@imagicreseller.in</p>
+            <p>📍 <strong>Registered Office:</strong> Level 4, DLF Cyber City, Gurugram, India</p>
+          </div>
         </div>
 
         {COLUMNS.map((col) => (
           <div key={col.title} className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">{col.title}</h3>
-            {col.links.map((link) => (
-              <Link key={link.label} href={link.href} className="text-sm text-muted hover:text-[var(--foreground)]">
-                {link.label}
-              </Link>
-            ))}
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900">{col.title}</h4>
+            <div className="flex flex-col gap-2">
+              {col.links.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="text-xs text-gray-600 hover:text-[#0071e3] transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </div>
         ))}
       </div>
-      <div className="border-t border-[var(--border)] py-6">
-        <div className="container-narrow flex flex-col items-center justify-between gap-2 text-xs text-muted md:flex-row">
-          <span>© {new Date().getFullYear()} iMagic Retail. All rights reserved.</span>
+
+      {/* 3. Legal Disclaimers & Copyright */}
+      <div className="border-t border-gray-200 py-6 text-[11px] text-gray-500">
+        <div className="container-narrow flex flex-col md:flex-row items-center justify-between gap-4">
+          <p>
+            © {new Date().getFullYear()} iMagic Retail India Pvt. Ltd. All rights reserved. GSTIN: 07AAACI1234F1Z8.
+          </p>
           <div className="flex gap-4">
-            <Link href="/faq" className="hover:text-[var(--foreground)]">Privacy</Link>
-            <Link href="/faq" className="hover:text-[var(--foreground)]">Terms</Link>
+            <Link href="/faq" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
+            <Link href="/faq" className="hover:text-gray-900 transition-colors">Terms of Sale</Link>
+            <Link href="/faq" className="hover:text-gray-900 transition-colors">Shipping &amp; Delivery</Link>
+            <Link href="/faq" className="hover:text-gray-900 transition-colors">Grievance Redressal</Link>
           </div>
         </div>
       </div>

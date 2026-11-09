@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const image =
     typeof body.image === "string" && body.image
       ? body.image
-      : phonePlaceholder(`${body.brand} ${body.model}`, "#1d1d1f", "#424245");
+      : phonePlaceholder(`${body.brand} ${body.model}`, body.color || "Midnight Black");
 
   const info = db
     .prepare(

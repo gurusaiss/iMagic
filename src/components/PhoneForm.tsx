@@ -71,7 +71,7 @@ export default function PhoneForm({ phone }: { phone?: Phone }) {
     setError(null);
     setSaving(true);
 
-    const image = phone?.image ?? phonePlaceholder(`${form.brand} ${form.model}`, "#1d1d1f", "#424245");
+    const image = phone?.image ?? phonePlaceholder(`${form.brand} ${form.model}`, form.color || "Midnight Black");
     const url = phone ? `/api/phones/${phone.id}` : "/api/phones";
     const method = phone ? "PUT" : "POST";
 
