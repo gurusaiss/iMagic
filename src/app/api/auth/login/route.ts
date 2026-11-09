@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { createSession, verifyPassword, SESSION_COOKIE } from "@/lib/auth";
+import { createSession, verifyPassword, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
+import { isRateLimited, clientKey } from "@/lib/rate-limit";
 
 type UserRow = {
   id: number;
@@ -11,29 +11,28 @@ type UserRow = {
   role: "admin" | "customer";
 };
 
-export async function POST(req: NextRequest) {
-  const { email, password } = (await req.json()) as { email: string; password: string };
-
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+export async function POST(req: Request) {
+  if (isRateLimited(clientKey(req, "login"))) {
+    return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
-  const user = db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(email.toLowerCase()) as UserRow | undefined;
+  const body = await req.json();
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "");
 
+  if (!email || !password) {
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  }
+
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as UserRow | undefined;
   if (!user || !verifyPassword(password, user.password_hash)) {
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   const token = createSession(user.id);
-  const store = await cookies();
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+  const res = NextResponse.json({
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
-
-  return NextResponse.json({ role: user.role, name: user.name });
+  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+  return res;
 }

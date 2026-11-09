@@ -1,50 +1,24 @@
 "use client";
 
 import { useCompare } from "@/lib/compare-context";
-import { useToast } from "@/lib/toast-context";
+import type { Phone } from "@/lib/types";
 
-export default function CompareButton({
-  phoneId,
-  phoneName,
-  size = "sm",
-}: {
-  phoneId: number;
-  phoneName: string;
-  size?: "sm" | "md";
-}) {
-  const { has, add, remove, isFull } = useCompare();
-  const { showToast } = useToast();
-  const active = has(phoneId);
-
-  function toggle(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (active) {
-      remove(phoneId);
-      showToast(`${phoneName} removed from compare`, "info");
-    } else if (isFull) {
-      showToast("Compare list full (max 3). Remove one first.", "error");
-    } else {
-      add(phoneId);
-      showToast(`${phoneName} added to compare`, "success");
-    }
-  }
-
-  const base =
-    size === "md"
-      ? "px-4 py-2 text-sm rounded-full font-semibold transition-all duration-150 active:scale-95"
-      : "px-3 py-1 text-xs rounded-full font-semibold transition-all duration-150 active:scale-95";
+export default function CompareButton({ phone }: { phone: Phone }) {
+  const { ids, toggle } = useCompare();
+  const active = ids.has(phone.id);
 
   return (
     <button
-      onClick={toggle}
-      className={`${base} ${
-        active
-          ? "bg-blue-600 text-white hover:bg-blue-700"
-          : "border border-gray-300 bg-white text-gray-700 hover:border-blue-500 hover:text-blue-600"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggle(phone);
+      }}
+      className={`text-xs font-medium underline-offset-2 hover:underline ${
+        active ? "text-[var(--accent)]" : "text-[var(--muted)]"
       }`}
     >
-      {active ? "✓ Comparing" : "⚖ Compare"}
+      {active ? "Remove from compare" : "Add to compare"}
     </button>
   );
 }

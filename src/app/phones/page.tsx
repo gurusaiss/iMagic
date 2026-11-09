@@ -1,93 +1,77 @@
+import Link from "next/link";
 import db from "@/lib/db";
-import { Phone } from "@/lib/types";
+import type { Phone } from "@/lib/types";
 import PhoneCard from "@/components/PhoneCard";
-import Filters from "@/components/Filters";
+import PhoneFilters from "@/components/PhoneFilters";
 
-export const dynamic = "force-dynamic";
-
-type SearchParams = {
-  brand?: string;
-  q?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  minRam?: string;
-  sort?: string;
-};
+export const metadata = { title: "Shop Phones — iMagic" };
 
 export default async function PhonesPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<{ brand?: string; sort?: string; min?: string; max?: string }>;
 }) {
-  const sp = await searchParams;
-
-  const brands = (
-    db.prepare("SELECT DISTINCT brand FROM phones ORDER BY brand").all() as {
-      brand: string;
-    }[]
-  ).map((b) => b.brand);
+  const { brand, sort, min, max } = await searchParams;
 
   const conditions: string[] = [];
-  const params: (string | number)[] = [];
+  const values: (string | number)[] = [];
 
-  if (sp.brand) {
+  if (brand) {
     conditions.push("brand = ?");
-    params.push(sp.brand);
+    values.push(brand);
   }
-  if (sp.q) {
-    conditions.push("(model LIKE ? OR brand LIKE ? OR processor LIKE ?)");
-    const like = `%${sp.q}%`;
-    params.push(like, like, like);
-  }
-  if (sp.minPrice) {
+  if (min) {
     conditions.push("price >= ?");
-    params.push(Number(sp.minPrice));
+    values.push(Number(min));
   }
-  if (sp.maxPrice) {
+  if (max) {
     conditions.push("price <= ?");
-    params.push(Number(sp.maxPrice));
+    values.push(Number(max));
   }
-  if (sp.minRam) {
-    conditions.push("ram_gb >= ?");
-    params.push(Number(sp.minRam));
-  }
-
-  let orderBy = "rating DESC";
-  if (sp.sort === "price_asc") orderBy = "price ASC";
-  if (sp.sort === "price_desc") orderBy = "price DESC";
-  if (sp.sort === "newest") orderBy = "id DESC";
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const phones = db
-    .prepare(`SELECT * FROM phones ${where} ORDER BY ${orderBy}`)
-    .all(...params) as Phone[];
+  const orderBy =
+    sort === "price-asc" ? "price ASC" : sort === "price-desc" ? "price DESC" : sort === "rating" ? "rating DESC" : "id DESC";
+
+  const phones = db.prepare(`SELECT * FROM phones ${where} ORDER BY ${orderBy}`).all(...values) as Phone[];
+
+  const brands = (db.prepare("SELECT DISTINCT brand FROM phones ORDER BY brand").all() as { brand: string }[]).map(
+    (r) => r.brand
+  );
 
   return (
-    <div className="animate-fade-in mx-auto max-w-6xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold">Shop Phones</h1>
-      <div className="flex flex-col gap-6 md:flex-row">
-        <Filters brands={brands} current={sp} />
-        <div className="flex-1">
-          <p className="mb-4 text-sm text-gray-500">{phones.length} phones found</p>
-          {phones.length === 0 ? (
-            <div className="rounded-xl border bg-white py-16 text-center text-gray-500">
-              <p className="text-4xl">🔍</p>
-              <p className="mt-2">No phones match your filters.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {phones.map((p, i) => (
-                <div
-                  key={p.id}
-                  style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
-                  className="animate-fade-in-up"
-                >
-                  <PhoneCard phone={p} />
-                </div>
-              ))}
-            </div>
-          )}
+    <div className="section">
+      <div className="container-narrow">
+        <h1 className="mb-8 text-3xl font-semibold tracking-tight">Shop phones</h1>
+        <div className="mb-6 flex flex-wrap gap-2">
+          <Link href="/phones" className={`pill ${!brand ? "bg-[var(--foreground)] text-white" : "bg-[#f5f5f7]"}`}>
+            All
+          </Link>
+          {brands.map((b) => (
+            <Link
+              key={b}
+              href={`/phones?brand=${b}`}
+              className={`pill ${brand === b ? "bg-[var(--foreground)] text-white" : "bg-[#f5f5f7]"}`}
+            >
+              {b}
+            </Link>
+          ))}
         </div>
+        <PhoneFilters />
+        {phones.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 py-20 text-center">
+            <p className="text-muted">No phones match these filters.</p>
+            <Link href="/phones" className="btn-secondary">
+              Clear filters
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {phones.map((p) => (
+              <PhoneCard key={p.id} phone={p} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

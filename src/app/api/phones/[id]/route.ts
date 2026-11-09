@@ -1,55 +1,52 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { validatePhoneInput } from "@/lib/validate-phone";
 
-type PhoneBody = {
-  brand: string;
-  model: string;
-  price: number;
-  mrp: number;
-  ram_gb: number;
-  storage_gb: number;
-  display: string;
-  battery_mah: number;
-  camera: string;
-  processor: string;
-  color: string;
-  description: string;
-  stock: number;
-};
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const phone = db.prepare("SELECT * FROM phones WHERE id = ?").get(id);
+  if (!phone) return NextResponse.json({ error: "Phone not found" }, { status: 404 });
+  return NextResponse.json({ phone });
+}
 
-export async function PUT(
-  req: NextRequest,
-  ctx: RouteContext<"/api/phones/[id]">
-) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id } = await ctx.params;
-  const body = (await req.json()) as PhoneBody;
+  const { id } = await params;
+  const body = await req.json();
+  const error = validatePhoneInput(body);
+  if (error) return NextResponse.json({ error }, { status: 400 });
 
-  db.prepare(
-    `UPDATE phones SET brand=@brand, model=@model, price=@price, mrp=@mrp, ram_gb=@ram_gb,
-     storage_gb=@storage_gb, display=@display, battery_mah=@battery_mah, camera=@camera,
-     processor=@processor, color=@color, description=@description, stock=@stock
-     WHERE id=@id`
-  ).run({ ...body, id });
+  const existing = db.prepare("SELECT image FROM phones WHERE id = ?").get(id) as { image: string } | undefined;
+  if (!existing) return NextResponse.json({ error: "Phone not found" }, { status: 404 });
 
+  const image = typeof body.image === "string" && body.image ? body.image : existing.image;
+
+  const info = db
+    .prepare(
+      `UPDATE phones SET brand=@brand, model=@model, price=@price, mrp=@mrp, ram_gb=@ram_gb,
+       storage_gb=@storage_gb, display=@display, battery_mah=@battery_mah, camera=@camera,
+       processor=@processor, color=@color, description=@description, image=@image, stock=@stock
+       WHERE id=@id`
+    )
+    .run({ ...body, image, id });
+
+  if (info.changes === 0) return NextResponse.json({ error: "Phone not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  ctx: RouteContext<"/api/phones/[id]">
-) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user || user.role !== "admin") {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id } = await ctx.params;
-  db.prepare("DELETE FROM phones WHERE id = ?").run(id);
+  const { id } = await params;
+  const info = db.prepare("DELETE FROM phones WHERE id = ?").run(id);
+  if (info.changes === 0) return NextResponse.json({ error: "Phone not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

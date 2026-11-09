@@ -2,229 +2,164 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useCart } from "@/lib/cart-context";
-import { useCompare } from "@/lib/compare-context";
-import { useCurrentUser } from "@/lib/use-current-user";
-import { formatINR } from "@/lib/format";
+import { useCurrentUser } from "@/lib/user-context";
+import { useWishlist } from "@/lib/wishlist-context";
+
+const CATEGORY_LINKS = [
+  { href: "/phones", label: "Shop" },
+  { href: "/compare", label: "Compare" },
+  { href: "/orders", label: "Orders" },
+];
 
 export default function Navbar() {
-  const { items, count, total, removeItem } = useCart();
-  const { ids: compareIds } = useCompare();
-  const { user, loading } = useCurrentUser();
+  const { totalItems } = useCart();
+  const { user, logout } = useCurrentUser();
+  const { phones: wishlistPhones } = useWishlist();
   const router = useRouter();
-  const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [pulse, setPulse] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const cartRef = useRef<HTMLDivElement>(null);
-  const mounted = useRef(false);
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-      if (cartRef.current && !cartRef.current.contains(e.target as Node)) setCartOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted.current) { mounted.current = true; return; }
-    setPulse(true);
-    const t = setTimeout(() => setPulse(false), 400);
-    return () => clearTimeout(t);
-  }, [count]);
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    router.push(query ? `/phones?q=${encodeURIComponent(query)}` : "/phones");
-  }
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await logout();
     setMenuOpen(false);
     router.push("/");
-    router.refresh();
+  }
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!query.trim()) return;
+    router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+    setSearchOpen(false);
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-gradient-to-r from-blue-700 to-blue-600 text-white shadow">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-        <Link href="/" className="shrink-0 text-2xl font-extrabold tracking-tight">
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-white/80 backdrop-blur-xl">
+      <nav className="container-narrow flex h-14 items-center justify-between">
+        <Link href="/" className="text-lg font-semibold tracking-tight">
           iMagic
         </Link>
 
-        <form onSubmit={handleSearch} className="hidden flex-1 sm:block">
-          <div className="flex overflow-hidden rounded-md bg-white transition-shadow focus-within:ring-2 focus-within:ring-amber-400">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for phones, brands and more"
-              className="flex-1 px-4 py-2 text-sm text-gray-900 outline-none"
-              aria-label="Search phones"
-            />
-            <button type="submit" className="flex items-center bg-amber-400 px-4 text-gray-900 transition-colors hover:bg-amber-500" aria-label="Search">
-              🔍
-            </button>
-          </div>
-        </form>
+        <div className="hidden items-center gap-8 text-sm md:flex">
+          {CATEGORY_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className="text-[var(--foreground)] hover:text-[var(--accent)]">
+              {link.label}
+            </Link>
+          ))}
+        </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-5 text-sm font-medium">
-          {/* Compare indicator */}
-          {compareIds.length > 0 && (
-            <Link
-              href={`/compare?ids=${compareIds.join(",")}`}
-              className="hidden items-center gap-1.5 transition-opacity hover:opacity-80 md:flex"
+        <div className="hidden items-center gap-5 md:flex">
+          <form onSubmit={handleSearchSubmit} className="flex items-center">
+            <div
+              onClick={() => searchInputRef.current?.focus()}
+              className={`flex items-center gap-2 rounded-full border border-[var(--border)] bg-[#f5f5f7] transition-all duration-300 ease-out ${
+                searchOpen || query ? "w-56 px-3 py-1.5" : "h-9 w-9 cursor-pointer justify-center"
+              }`}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-gray-900">
-                {compareIds.length}
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" className="shrink-0 text-muted">
+                <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M14 14L18 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => setSearchOpen(false)}
+                placeholder="Search iMagic"
+                className={`bg-transparent text-sm outline-none transition-all duration-300 ease-out ${
+                  searchOpen || query ? "w-full opacity-100" : "w-0 opacity-0"
+                }`}
+              />
+            </div>
+          </form>
+          <Link href="/wishlist" className="relative text-sm hover:text-[var(--accent)]">
+            Wishlist
+            {wishlistPhones.length > 0 && (
+              <span className="absolute -right-3 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--foreground)] text-[10px] text-white">
+                {wishlistPhones.length}
               </span>
-              <span className="text-xs font-semibold">Compare</span>
+            )}
+          </Link>
+          <Link href="/cart" className="relative text-sm hover:text-[var(--accent)]">
+            Cart
+            {totalItems > 0 && (
+              <span className="absolute -right-3 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] text-white">
+                {totalItems}
+              </span>
+            )}
+          </Link>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <Link href="/account" className="text-sm hover:text-[var(--accent)]">
+                {user.name.split(" ")[0]}
+              </Link>
+              <button onClick={handleLogout} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="btn-primary text-xs">
+              Sign in
             </Link>
           )}
-
-          {/* Account dropdown */}
-          <div ref={menuRef} className="relative">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="flex flex-col items-start leading-tight transition-opacity hover:opacity-80"
-              aria-expanded={menuOpen}
-              aria-haspopup="true"
-            >
-              {loading ? (
-                <span className="text-xs">Loading…</span>
-              ) : user ? (
-                <>
-                  <span className="text-xs text-blue-100">Hello, {user.name.split(" ")[0]}</span>
-                  <span className="font-semibold">Account &amp; Lists ▾</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs text-blue-100">Hello, sign in</span>
-                  <span className="font-semibold">Account &amp; Lists ▾</span>
-                </>
-              )}
-            </button>
-
-            {menuOpen && (
-              <div className="animate-fade-in-up absolute right-0 mt-2 w-56 rounded-md border bg-white py-2 text-gray-800 shadow-xl">
-                {user ? (
-                  <>
-                    <div className="border-b px-4 py-2 text-xs text-gray-500">
-                      Signed in as<br />
-                      <span className="font-semibold text-gray-900">{user.email}</span>
-                    </div>
-                    {user.role === "admin" && (
-                      <Link href="/admin" onClick={() => setMenuOpen(false)} className="block px-4 py-2 transition-colors hover:bg-gray-50">
-                        Admin Dashboard
-                      </Link>
-                    )}
-                    <Link href="/orders" onClick={() => setMenuOpen(false)} className="block px-4 py-2 transition-colors hover:bg-gray-50">
-                      My Orders
-                    </Link>
-                    <button onClick={handleLogout} className="block w-full px-4 py-2 text-left text-red-600 transition-colors hover:bg-gray-50">
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <Link href="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-2 font-semibold text-blue-600 transition-colors hover:bg-gray-50">
-                    Login / Sign Up
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-
-          <Link href="/orders" className="hidden flex-col leading-tight transition-opacity hover:opacity-80 md:flex">
-            <span className="text-xs text-blue-100">Returns</span>
-            <span className="font-semibold">&amp; Orders</span>
-          </Link>
-
-          {/* Cart dropdown */}
-          <div ref={cartRef} className="relative">
-            <button
-              onClick={() => setCartOpen((v) => !v)}
-              className="relative flex items-center gap-2 transition-opacity hover:opacity-80"
-              aria-label={`Cart with ${count} items`}
-            >
-              <span className="text-2xl">🛒</span>
-              {count > 0 && (
-                <span className={`absolute -top-2 left-4 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-gray-900 ${pulse ? "animate-pulse-once" : ""}`}>
-                  {count}
-                </span>
-              )}
-              <span className="hidden flex-col items-start leading-tight sm:flex">
-                <span className="text-xs text-blue-100">Cart</span>
-                <span className="font-semibold">{items.length > 0 ? formatINR(total) : "Empty"}</span>
-              </span>
-            </button>
-
-            {cartOpen && (
-              <div className="animate-fade-in-up absolute right-0 mt-2 w-80 rounded-md border bg-white py-3 text-gray-800 shadow-xl">
-                {items.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-sm text-gray-500">Your cart is empty.</div>
-                ) : (
-                  <>
-                    <div className="max-h-72 space-y-3 overflow-y-auto px-4">
-                      {items.map((item) => (
-                        <div key={item.phoneId} className="flex items-center gap-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={item.image} alt={item.name} className="h-12 w-12 shrink-0 rounded border object-contain" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{item.name}</p>
-                            <p className="text-xs text-gray-500">{item.qty} × {formatINR(item.price)}</p>
-                          </div>
-                          <button onClick={() => removeItem(item.phoneId)} className="text-xs text-red-500 hover:underline">
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between border-t px-4 pt-3 text-sm font-semibold">
-                      <span>Subtotal</span>
-                      <span>{formatINR(total)}</span>
-                    </div>
-                    <div className="mt-3 flex gap-2 px-4">
-                      <Link href="/cart" onClick={() => setCartOpen(false)} className="btn-secondary flex-1 !py-2 text-sm">
-                        View Cart
-                      </Link>
-                      <Link href="/checkout" onClick={() => setCartOpen(false)} className="btn-primary flex-1 !py-2 text-sm">
-                        Checkout
-                      </Link>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
         </div>
-      </div>
 
-      {/* Mobile search */}
-      <form onSubmit={handleSearch} className="px-4 pb-3 sm:hidden">
-        <div className="flex overflow-hidden rounded-md bg-white">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search phones…"
-            className="flex-1 px-4 py-2 text-sm text-gray-900 outline-none"
-          />
-          <button type="submit" className="bg-amber-400 px-4 text-gray-900">🔍</button>
-        </div>
-      </form>
-
-      {/* Category nav */}
-      <nav className="hidden gap-5 overflow-x-auto bg-blue-800/60 px-4 py-2 text-xs font-medium sm:flex" aria-label="Categories">
-        <Link href="/phones" className="transition-opacity hover:opacity-80">All Phones</Link>
-        <Link href="/phones?brand=Nexora" className="transition-opacity hover:opacity-80">Nexora</Link>
-        <Link href="/phones?brand=Veltrix" className="transition-opacity hover:opacity-80">Veltrix</Link>
-        <Link href="/phones?brand=Orova" className="transition-opacity hover:opacity-80">Orova</Link>
-        <Link href="/phones?sort=price_asc" className="transition-opacity hover:opacity-80">Deals Under ₹15,000</Link>
-        <Link href="/phones?sort=newest" className="transition-opacity hover:opacity-80">New Arrivals</Link>
-        <Link href="/compare" className="transition-opacity hover:opacity-80">⚖ Compare</Link>
+        <button
+          className="flex h-9 w-9 items-center justify-center md:hidden"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="Menu"
+        >
+          <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+            <path d="M0 1H20M0 7H20M0 13H20" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </button>
       </nav>
+
+      {menuOpen && (
+        <div className="border-t border-[var(--border)] bg-white px-6 py-4 md:hidden">
+          <div className="flex flex-col gap-4 text-sm">
+            <form onSubmit={handleSearchSubmit}>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search iMagic"
+                className="w-full rounded-full border border-[var(--border)] bg-[#f5f5f7] px-4 py-2 text-sm"
+              />
+            </form>
+            {CATEGORY_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
+                {link.label}
+              </Link>
+            ))}
+            <Link href="/wishlist" onClick={() => setMenuOpen(false)}>
+              Wishlist ({wishlistPhones.length})
+            </Link>
+            <Link href="/cart" onClick={() => setMenuOpen(false)}>
+              Cart ({totalItems})
+            </Link>
+            {user ? (
+              <>
+                <Link href="/account" onClick={() => setMenuOpen(false)}>
+                  Account
+                </Link>
+                <button onClick={handleLogout} className="text-left text-[var(--muted)]">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link href="/login" onClick={() => setMenuOpen(false)}>
+                Sign in
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

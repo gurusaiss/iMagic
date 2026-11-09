@@ -1,44 +1,42 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-
-const MAX_COMPARE = 3;
+import { createContext, useContext, useState, useCallback } from "react";
+import type { Phone } from "./types";
 
 type CompareContextType = {
-  ids: number[];
-  add: (id: number) => void;
+  phones: Phone[];
+  ids: Set<number>;
+  toggle: (phone: Phone) => void;
   remove: (id: number) => void;
   clear: () => void;
-  has: (id: number) => boolean;
-  isFull: boolean;
-  count: number;
 };
 
 const CompareContext = createContext<CompareContextType | null>(null);
+const MAX_COMPARE = 3;
 
-export function CompareProvider({ children }: { children: ReactNode }) {
-  const [ids, setIds] = useState<number[]>([]);
+export function CompareProvider({ children }: { children: React.ReactNode }) {
+  const [phones, setPhones] = useState<Phone[]>([]);
 
-  function add(id: number) {
-    setIds((prev) => (prev.includes(id) || prev.length >= MAX_COMPARE ? prev : [...prev, id]));
-  }
+  const toggle = useCallback((phone: Phone) => {
+    setPhones((prev) => {
+      if (prev.some((p) => p.id === phone.id)) {
+        return prev.filter((p) => p.id !== phone.id);
+      }
+      if (prev.length >= MAX_COMPARE) return prev;
+      return [...prev, phone];
+    });
+  }, []);
 
-  function remove(id: number) {
-    setIds((prev) => prev.filter((x) => x !== id));
-  }
+  const remove = useCallback((id: number) => {
+    setPhones((prev) => prev.filter((p) => p.id !== id));
+  }, []);
 
-  function clear() {
-    setIds([]);
-  }
+  const clear = useCallback(() => setPhones([]), []);
 
-  function has(id: number) {
-    return ids.includes(id);
-  }
+  const ids = new Set(phones.map((p) => p.id));
 
   return (
-    <CompareContext.Provider
-      value={{ ids, add, remove, clear, has, isFull: ids.length >= MAX_COMPARE, count: ids.length }}
-    >
+    <CompareContext.Provider value={{ phones, ids, toggle, remove, clear }}>
       {children}
     </CompareContext.Provider>
   );

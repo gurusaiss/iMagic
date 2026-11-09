@@ -1,8 +1,8 @@
-import { MetadataRoute } from "next";
+import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/admin", "/api/", "/checkout", "/order/"] },
-    sitemap: "https://imagic.vercel.app/sitemap.xml",
+    rules: { userAgent: "*", allow: "/" },
+    sitemap: "https://imagic.example.com/sitemap.xml",
   };
 }

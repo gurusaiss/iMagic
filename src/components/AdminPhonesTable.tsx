@@ -2,65 +2,41 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Phone } from "@/lib/types";
-import { formatINR } from "@/lib/format";
-import { useToast } from "@/lib/toast-context";
+import { apiFetch } from "@/lib/api-fetch";
+import type { Phone } from "@/lib/types";
 
 export default function AdminPhonesTable({ phones }: { phones: Phone[] }) {
   const router = useRouter();
-  const { showToast } = useToast();
-  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  async function handleDelete(id: number, model: string) {
-    if (!confirm(`Delete "${model}"? This can't be undone.`)) return;
-    setDeletingId(id);
-    const res = await fetch(`/api/phones/${id}`, { method: "DELETE" });
-    setDeletingId(null);
-    if (res.ok) {
-      showToast(`${model} deleted`, "success");
-      router.refresh();
-    } else {
-      showToast("Failed to delete phone", "error");
-    }
+  async function handleDelete(id: number) {
+    if (!confirm("Delete this phone?")) return;
+    const res = await apiFetch(`/api/phones/${id}`, { method: "DELETE" });
+    if (res.ok) router.refresh();
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-gray-50 text-gray-500">
-          <tr>
-            <th className="px-4 py-3">Phone</th>
-            <th className="px-4 py-3">Brand</th>
-            <th className="px-4 py-3">Price</th>
-            <th className="px-4 py-3">Stock</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+    <div className="card overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left text-muted">
+            <th className="p-4">Phone</th>
+            <th className="p-4">Price</th>
+            <th className="p-4">Stock</th>
+            <th className="p-4"></th>
           </tr>
         </thead>
         <tbody>
           {phones.map((p) => (
-            <tr key={p.id} className="border-t transition-colors hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium">{p.model}</td>
-              <td className="px-4 py-3">{p.brand}</td>
-              <td className="px-4 py-3">{formatINR(p.price)}</td>
-              <td className="px-4 py-3">
-                <span className={p.stock <= 8 ? "font-semibold text-red-600" : ""}>
-                  {p.stock}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-right">
-                <Link
-                  href={`/admin/phones/${p.id}/edit`}
-                  className="mr-3 text-blue-600 transition-colors hover:underline"
-                >
+            <tr key={p.id} className="border-b border-[var(--border)] last:border-0">
+              <td className="p-4 font-medium">{p.brand} {p.model}</td>
+              <td className="p-4">₹{p.price.toLocaleString("en-IN")}</td>
+              <td className="p-4">{p.stock}</td>
+              <td className="flex gap-3 p-4">
+                <Link href={`/admin/phones/${p.id}/edit`} className="text-[var(--accent)]">
                   Edit
                 </Link>
-                <button
-                  onClick={() => handleDelete(p.id, p.model)}
-                  disabled={deletingId === p.id}
-                  className="text-red-600 transition-colors hover:underline disabled:opacity-60"
-                >
-                  {deletingId === p.id ? "Deleting..." : "Delete"}
+                <button onClick={() => handleDelete(p.id)} className="text-[var(--danger)]">
+                  Delete
                 </button>
               </td>
             </tr>

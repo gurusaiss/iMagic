@@ -1,14 +1,16 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import bcrypt from "bcryptjs";
 import { phonePlaceholder } from "./placeholder";
 import { ADMIN_EMAILS } from "./auth-constants";
 
-// On Vercel the project directory is read-only; only /tmp is writable.
-const dataDir = process.env.VERCEL
-  ? path.join("/tmp", "imagic-data")
-  : path.join(process.cwd(), "data");
+// The DB file (and its WAL/SHM siblings, rewritten on every write) must live
+// outside the project directory: Next.js dev's file watcher treats any
+// in-tree change as a reason to rebuild, which turns every DB write into an
+// HMR refresh loop. /tmp is writable everywhere, including on Vercel.
+const dataDir = path.join(os.tmpdir(), "imagic-data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, "app.db");
@@ -81,6 +83,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_method TEXT NOT NULL DEFAULT 'upi',
   total INTEGER NOT NULL,
   assigned_staff_id INTEGER REFERENCES staff_members(id),
+  idempotency_key TEXT UNIQUE,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -94,23 +97,20 @@ CREATE TABLE IF NOT EXISTS order_items (
   qty INTEGER NOT NULL
 );
 
--- Indexes for common queries
+CREATE TABLE IF NOT EXISTS wishlist_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  phone_id INTEGER NOT NULL REFERENCES phones(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, phone_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_phones_brand ON phones(brand);
 `);
-
-// Add payment_method column to existing DBs that predate this migration
-try {
-  db.exec("ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'upi'");
-} catch { /* column already exists */ }
-
-// Add assigned_staff_id column to existing DBs
-try {
-  db.exec("ALTER TABLE orders ADD COLUMN assigned_staff_id INTEGER REFERENCES staff_members(id)");
-} catch { /* column already exists */ }
 
 const count = (db.prepare("SELECT COUNT(*) as c FROM phones").get() as { c: number }).c;
 
@@ -199,7 +199,6 @@ if (count === 0) {
   insertMany(seedPhones);
 }
 
-// Seed admin and demo customer
 const insertUser = db.prepare(`
   INSERT OR IGNORE INTO users (name, email, password_hash, role) VALUES (@name, @email, @password_hash, @role)
 `);
@@ -216,7 +215,6 @@ insertUser.run({
   role: "customer",
 });
 
-// Seed demo delivery staff
 const staffCount = (db.prepare("SELECT COUNT(*) as c FROM staff_members").get() as { c: number }).c;
 if (staffCount === 0) {
   const insertStaff = db.prepare(

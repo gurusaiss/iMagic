@@ -1,41 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { createSession, hashPassword, isAdminEmail, SESSION_COOKIE } from "@/lib/auth";
+import { createSession, hashPassword, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
+import { isRateLimited, clientKey } from "@/lib/rate-limit";
 
-export async function POST(req: NextRequest) {
-  const { name, email, password } = (await req.json()) as {
-    name: string;
-    email: string;
-    password: string;
-  };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!name || !email || !password || password.length < 6) {
-    return NextResponse.json(
-      { error: "Please fill in all fields — password must be at least 6 characters." },
-      { status: 400 }
-    );
+export async function POST(req: Request) {
+  if (isRateLimited(clientKey(req, "signup"))) {
+    return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email.toLowerCase());
+  const body = await req.json();
+  const name = String(body.name ?? "").trim();
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "");
+
+  if (!name || name.length > 80 || /[<>]/.test(name)) {
+    return NextResponse.json({ error: "Please enter a valid name" }, { status: 400 });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "Please enter a valid email" }, { status: 400 });
+  }
+  if (password.length < 6) {
+    return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+  }
+
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) {
-    return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
   }
-
-  const role = isAdminEmail(email) ? "admin" : "customer";
 
   const info = db
-    .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)")
-    .run(name, email.toLowerCase(), hashPassword(password), role);
+    .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'customer')")
+    .run(name, email, hashPassword(password));
 
-  const token = createSession(info.lastInsertRowid as number);
-  const store = await cookies();
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+  const token = createSession(Number(info.lastInsertRowid));
+  const res = NextResponse.json({
+    user: { id: info.lastInsertRowid, name, email, role: "customer" },
   });
-
-  return NextResponse.json({ role, name });
+  res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+  return res;
 }

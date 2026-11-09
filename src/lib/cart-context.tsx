@@ -1,88 +1,98 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import type { Phone } from "./types";
 
 export type CartItem = {
-  phoneId: number;
-  name: string;
-  image: string;
+  id: number;
+  brand: string;
+  model: string;
   price: number;
+  mrp: number;
+  image: string;
   qty: number;
+  stock: number;
 };
 
 type CartContextType = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "qty">, qty?: number) => void;
-  updateQty: (phoneId: number, qty: number) => void;
-  removeItem: (phoneId: number) => void;
-  clearCart: () => void;
-  total: number;
-  count: number;
+  loaded: boolean;
+  add: (phone: Phone, qty?: number) => void;
+  remove: (id: number) => void;
+  setQty: (id: number, qty: number) => void;
+  clear: () => void;
+  totalItems: number;
+  totalPrice: number;
+  totalSavings: number;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
 const STORAGE_KEY = "imagic_cart";
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setTimeout(() => setItems(parsed), 0);
-      }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from localStorage on mount
+      if (raw) setItems(JSON.parse(raw));
     } catch {
-      // ignore
+      // ignore corrupted storage
+    } finally {
+      setLoaded(true);
     }
-    setTimeout(() => setLoaded(true), 0);
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch {
-      // ignore
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items, loaded]);
 
-  function addItem(item: Omit<CartItem, "qty">, qty = 1) {
+  const add = useCallback((phone: Phone, qty = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.phoneId === item.phoneId);
+      const existing = prev.find((i) => i.id === phone.id);
       if (existing) {
         return prev.map((i) =>
-          i.phoneId === item.phoneId ? { ...i, qty: i.qty + qty } : i
+          i.id === phone.id ? { ...i, qty: Math.min(i.qty + qty, phone.stock) } : i
         );
       }
-      return [...prev, { ...item, qty }];
+      return [
+        ...prev,
+        {
+          id: phone.id,
+          brand: phone.brand,
+          model: phone.model,
+          price: phone.price,
+          mrp: phone.mrp,
+          image: phone.image,
+          qty: Math.min(qty, phone.stock),
+          stock: phone.stock,
+        },
+      ];
     });
-  }
+  }, []);
 
-  function updateQty(phoneId: number, qty: number) {
+  const remove = useCallback((id: number) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  const setQty = useCallback((id: number, qty: number) => {
     setItems((prev) =>
-      qty <= 0
-        ? prev.filter((i) => i.phoneId !== phoneId)
-        : prev.map((i) => (i.phoneId === phoneId ? { ...i, qty } : i))
+      prev.map((i) => (i.id === id ? { ...i, qty: Math.max(1, Math.min(qty, i.stock)) } : i))
     );
-  }
+  }, []);
 
-  function removeItem(phoneId: number) {
-    setItems((prev) => prev.filter((i) => i.phoneId !== phoneId));
-  }
+  const clear = useCallback(() => setItems([]), []);
 
-  function clearCart() {
-    setItems([]);
-  }
-
-  const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const count = items.reduce((sum, i) => sum + i.qty, 0);
+  const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
+  const totalPrice = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+  const totalSavings = items.reduce((sum, i) => sum + i.qty * Math.max(0, (i.mrp ?? i.price) - i.price), 0);
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, updateQty, removeItem, clearCart, total, count }}
+      value={{ items, loaded, add, remove, setQty, clear, totalItems, totalPrice, totalSavings }}
     >
       {children}
     </CartContext.Provider>

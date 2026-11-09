@@ -1,51 +1,39 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 
-type ToastType = "success" | "error" | "info";
-type Toast = { id: number; message: string; type: ToastType };
+type Toast = { id: number; message: string; type: "success" | "error" | "info" };
 
 type ToastContextType = {
-  showToast: (message: string, type?: ToastType) => void;
+  toasts: Toast[];
+  show: (message: string, type?: Toast["type"]) => void;
 };
 
 const ToastContext = createContext<ToastContextType | null>(null);
+let nextId = 1;
 
-const STYLES: Record<ToastType, string> = {
-  success: "bg-green-600",
-  error: "bg-red-600",
-  info: "bg-gray-900",
-};
-
-const ICONS: Record<ToastType, string> = {
-  success: "✓",
-  error: "✕",
-  info: "ℹ",
-};
-
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "success") => {
-    const id = Date.now() + Math.random();
+  const show = useCallback((message: string, type: Toast["type"] = "success") => {
+    const id = nextId++;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2800);
+    }, 3000);
   }, []);
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ toasts, show }}>
       {children}
-      <div className="pointer-events-none fixed top-20 right-4 z-[100] flex flex-col items-end gap-2 sm:top-24">
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`animate-toast-in pointer-events-auto flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${STYLES[t.type]}`}
+            className={`rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg transition-all ${
+              t.type === "success" ? "bg-[#1d1d1f]" : t.type === "error" ? "bg-red-600" : "bg-[#0071e3]"
+            }`}
           >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs">
-              {ICONS[t.type]}
-            </span>
             {t.message}
           </div>
         ))}

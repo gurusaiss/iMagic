@@ -27,7 +27,8 @@ export const ORDER_STATUS_FLOW = [
 export type OrderStatus =
   | (typeof ORDER_STATUS_FLOW)[number]
   | "RETURN_REQUESTED"
-  | "REFUNDED";
+  | "REFUNDED"
+  | "CANCELLED";
 
 export type Order = {
   id: number;
@@ -72,4 +73,5 @@ export const STATUS_LABELS: Record<string, string> = {
   DELIVERED: "Delivered",
   RETURN_REQUESTED: "Return Requested",
   REFUNDED: "Refunded",
+  CANCELLED: "Cancelled",
 };
